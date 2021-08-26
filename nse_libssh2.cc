@@ -639,6 +639,69 @@ static int l_userauth_password (lua_State *L) {
     return userauth_password(L, 0, 0);
 }
 
+/*
+* Attempts to authenticate session with provided username and password
+* in keyboard-interactive mode.  The supplied password is sent but no
+* other interactive prompts are handled.
+* returns true on success and false otherwise
+*/
+
+/*
+* userauth_keyboard_interactive(state, username, password)
+*/
+static int userauth_keyboard_interactive (lua_State *L, int status, lua_KContext ctx) {
+    int rc;
+    const char *username, *password;
+    struct ssh_userdata *state;
+    LIBSSH2_USERAUTH_KBDINT_RESPONSE *responses;
+
+    state = (struct ssh_userdata *) nseU_checkudata(L, 1, SSH2_UDATA, "ssh2");
+    username = luaL_checkstring(L, 2);
+    password = luaL_checkstring(L, 3);
+    responses[0].text = strdup(password);
+    responses[0].length = strlen(password);
+
+    assert(state->session != NULL);
+    while ((rc = libssh2_userauth_keyboard_interactive(state->session,
+        username,
+        &userauth_keyboard_interactive)) == LIBSSH2_ERROR_EAGAIN) {
+        luaL_getmetafield(L, 1, "filter");
+        lua_pushvalue(L, 1);
+
+        assert(lua_status(L) == LUA_OK);
+        lua_callk(L, 1, 0, 0, userauth_keyboard_interactive);
+    }
+
+    if (rc == 0)
+        lua_pushboolean(L, 1);
+    else
+        lua_pushboolean(L, 0);
+
+    return 1;
+}
+
+static void userauth_keyboard_interactive_callback(const char *name,
+                         int name_len,
+                         const char *instruction,
+                         int instruction_len,
+                         int num_prompts,
+                         const LIBSSH2_USERAUTH_KBDINT_PROMPT *prompts,
+                         LIBSSH2_USERAUTH_KBDINT_RESPONSE *responses,
+                         void **abstract) {
+    (void)name;
+    (void)name_len;
+    (void)instruction;
+    (void)instruction_len;
+    (void)prompts;
+    (void)num_prompts;
+    (void)responses;
+    (void)abstract;
+}
+
+static int l_userauth_keyboard_interactive (lua_State *L) {
+    return userauth_keyboard_interactive(L, 0, 0);
+}
+
 static int session_close (lua_State *L, int status, lua_KContext ctx) {
     int rc;
     struct ssh_userdata *state;
@@ -883,6 +946,7 @@ static const struct luaL_Reg libssh2[] = {
     { "read_publickey", l_read_publickey },
     { "publickey_canauth", l_publickey_canauth },
     { "userauth_password", l_userauth_password },
+    { "userauth_keyboard_interactive", l_userauth_keyboard_interactive },
     { "session_close", l_session_close },
     { "open_channel", l_open_channel},
     { "channel_read", l_channel_read},

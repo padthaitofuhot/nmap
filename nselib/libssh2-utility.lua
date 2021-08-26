@@ -95,6 +95,24 @@ function SSHConnection:password_auth (username, password)
 end
 
 ---
+-- Attempts to authenticate using provided credentials in keyboard-interactive mode.
+--
+-- @param username A username to authenticate as.
+-- @param password A password to authenticate as.
+-- @return true on success or false on failure.
+function SSHConnection:password_keyboard_interactive_auth (username, password)
+  if not self.session then
+    return false
+  end
+  if libssh2.userauth_keyboard_interactive(self.session, username, password) then
+    self.authenticated = true
+    return true
+  else
+    return false
+  end
+end
+
+---
 -- Attempts to authenticate using provided private key.
 --
 -- @param username A username to authenticate as.
